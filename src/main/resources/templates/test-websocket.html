@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Debug Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .log { background: #f5f5f5; padding: 10px; margin: 5px 0; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <h1>🔍 WebSocket Connection Debug</h1>
+    <div id="status">Starting test...</div>
+    <div id="logs"></div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    
+    <script>
+        const statusDiv = document.getElementById('status');
+        const logsDiv = document.getElementById('logs');
+        
+        function log(message, type = 'log') {
+            console.log(message);
+            const div = document.createElement('div');
+            div.className = `log ${type}`;
+            div.innerHTML = new Date().toLocaleTimeString() + ' - ' + message;
+            logsDiv.appendChild(div);
+        }
+        
+        function updateStatus(message, type = 'log') {
+            statusDiv.innerHTML = message;
+            statusDiv.className = type;
+        }
+        
+        // Test 1: Check if SockJS library loaded
+        log('✅ Step 1: SockJS library loaded: ' + (typeof SockJS !== 'undefined'));
+        log('✅ Step 2: Stomp library loaded: ' + (typeof Stomp !== 'undefined'));
+        
+        // Test 2: Try to create SockJS connection
+        try {
+            log('🔄 Step 3: Creating SockJS connection to /ws...');
+            updateStatus('🔄 Connecting to WebSocket...', 'log');
+            
+            const socket = new SockJS('/ws');
+            log('✅ Step 4: SockJS object created successfully');
+            
+            // Test 3: Create STOMP client
+            const stompClient = Stomp.over(socket);
+            stompClient.debug = function(str) {
+                log('🔧 STOMP Debug: ' + str);
+            };
+            
+            log('✅ Step 5: STOMP client created, attempting connection...');
+            
+            // Test 4: Connect
+            stompClient.connect({}, 
+                function(frame) {
+                    log('🎉 SUCCESS: WebSocket connected!', 'success');
+                    updateStatus('✅ WebSocket Connected Successfully!', 'success');
+                    log('📋 Connection frame: ' + frame);
+                    
+                    // Test subscription
+                    stompClient.subscribe('/topic/test', function(message) {
+                        log('📨 Received test message: ' + message.body);
+                    });
+                    
+                    // Send test message
+                    stompClient.send('/app/test', {}, JSON.stringify({message: 'Hello WebSocket!'}));
+                },
+                function(error) {
+                    log('❌ CONNECTION ERROR: ' + JSON.stringify(error), 'error');
+                    updateStatus('❌ WebSocket Connection Failed', 'error');
+                    log('🔍 Error details: ' + error);
+                }
+            );
+            
+        } catch (exception) {
+            log('💥 EXCEPTION: ' + exception.toString(), 'error');
+            updateStatus('💥 Exception occurred', 'error');
+        }
+        
+        // Test 5: Check network connectivity
+        fetch('/health')
+            .then(response => response.text())
+            .then(data => log('✅ Server health check: ' + data))
+            .catch(error => log('❌ Server health check failed: ' + error, 'error'));
+    </script>
+</body>
+</html>
